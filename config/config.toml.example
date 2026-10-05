@@ -1,0 +1,37 @@
+# Non-secret settings only. The service reads TELEGRAM_BOT_TOKEN from
+# ~/.config/telegram-pi-bot/secrets.env (mode 0600).
+[bot]
+allowed_user_id = 123456789
+private_chat_only = true
+text_delay_seconds = 5
+media_delay_seconds = 10
+ui_timeout_seconds = 600
+turn_timeout_seconds = 21600
+
+[paths]
+cwd = "~"
+pi_cli = "/usr/bin/pi"
+state_dir = "~/.local/state/telegram-pi-bot"
+groq_key_file = "~/.config/groq/api_key"
+
+[models]
+# Rollback-compatibility placeholders for the previous release. Current releases
+# inherit new-session defaults from Pi's effective user and project settings.
+default_provider = "ollama"
+default_id = "qwen3.8-orcarouter:latest"
+agy_provider = "antigravity"
+agy_id = "gemini-3.7-flash"
+agy_thinking = "high"
+
+[limits]
+inbound_items = 10
+inbound_bundle_bytes = 52428800
+voice_bytes = 20971520
+document_bytes = 20971520
+photo_bytes = 10485760
+outbound_artifacts = 5
+outbound_total_bytes = 52428800
+outbound_file_bytes = 20971520
+outbound_image_bytes = 10485760
+staging_retention_seconds = 86400
+metadata_retention_seconds = 2592000

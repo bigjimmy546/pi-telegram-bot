@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telegram-pi-bot"
+version = "0.1.0"
+description = "Private Telegram front end for the installed Pi coding agent"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "httpx==0.28.1",
+  "python-telegram-bot==22.8",
+]
+
+[project.scripts]
+telegram-pi-bot = "telegram_pi_bot.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+telegram_pi_bot = ["extensions/*.ts"]

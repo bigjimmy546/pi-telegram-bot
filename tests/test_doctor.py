@@ -22,6 +22,19 @@ from tests.test_config import _config_text
 
 
 class DoctorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_doctor_checks_the_configured_pi_executable(self):
+        system = await FakeSystem.start()
+        self.addAsyncCleanup(system.close)
+        config = replace(system.app.config, pi_cli=system.root / "custom-pi")
+        runner = AsyncMock(return_value="1.0.2")
+        checks = await Doctor(
+            config, system.pi, telegram=system.telegram,
+            delivery=system.app.delivery, command_runner=runner,
+        ).run()
+        self.assertTrue(next(check for check in checks if check.name == "pi_version").ok)
+        runner.assert_any_await((str(config.pi_cli), "--version"))
+        self.assertNotIn(("/usr/bin/pi", "--version"), [call.args[0] for call in runner.await_args_list])
+
     async def test_doctor_accepts_only_the_explicitly_tested_pi_version(self):
         system = await FakeSystem.start()
         self.addAsyncCleanup(system.close)

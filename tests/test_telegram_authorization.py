@@ -74,6 +74,10 @@ class UnauthorizedUpdate:
     def callback_query(self):
         raise AssertionError("unauthorized callback content was inspected")
 
+    @property
+    def edited_message(self):
+        raise AssertionError("unauthorized edited message was inspected")
+
 
 def _text_update(text: str = "hello", *, chat_type: str = "private"):
     return SimpleNamespace(
@@ -92,6 +96,36 @@ def _text_update(text: str = "hello", *, chat_type: str = "private"):
 
 
 class TelegramAuthorizationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_edited_messages_have_no_effects_or_update_claim(self) -> None:
+        actions = []
+        order = []
+        claims = []
+
+        async def dispatch(action):
+            actions.append(action)
+
+        adapter = TelegramAdapter(
+            _config(), dispatch, port=RecordingPort(order),
+            claim_update=lambda update_id, now_ms: claims.append(update_id) or True,
+        )
+        await adapter.handle_update(_text_update())
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(claims, [100])
+        order.clear()
+        for text in ("corrected prompt", "/stop", None):
+            update = _text_update(text)
+            update.update_id = 101
+            update.edited_message = update.effective_message
+            if text is None:
+                update.effective_message.document = SimpleNamespace(
+                    file_id="edited-file", file_size=1,
+                    file_name="report.txt", mime_type="text/plain",
+                )
+            await adapter.handle_update(update)
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(order, [])
+        self.assertEqual(claims, [100])
+
     async def test_unauthorized_update_has_zero_observable_effects(self) -> None:
         actions = []
         order: list[tuple[object, ...]] = []
@@ -185,6 +219,31 @@ class TelegramAuthorizationTests(unittest.IsolatedAsyncioTestCase):
         adapter = TelegramAdapter(_config(), dispatch, port=RecordingPort(order))
         await adapter.handle_update(_text_update("/skill"))
         self.assertEqual(order, [("dispatch", "command_skill_catalog")])
+
+    async def test_unknown_slash_input_gets_one_notice_and_no_prompt(self) -> None:
+        actions = []
+        order = []
+        claimed = set()
+
+        async def dispatch(action):
+            actions.append(action)
+
+        def claim(update_id, now_ms):
+            if update_id in claimed:
+                return False
+            claimed.add(update_id)
+            return True
+
+        adapter = TelegramAdapter(
+            _config(), dispatch, port=RecordingPort(order), claim_update=claim,
+        )
+        update = _text_update("/etc/hosts has a typo")
+        await adapter.handle_update(update)
+        await adapter.handle_update(update)
+        self.assertEqual(actions, [])
+        self.assertEqual(len(order), 1)
+        self.assertEqual(order[0][0], "text")
+        self.assertIn("Unknown bot command", order[0][2])
 
     async def test_authorized_callback_is_acknowledged_after_dispatch(self) -> None:
         order: list[tuple[object, ...]] = []

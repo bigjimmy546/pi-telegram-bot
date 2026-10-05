@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 
@@ -180,7 +181,13 @@ def run(scenario: str) -> None:
             return
         if scenario == "close" and request.get("type") == "exit":
             return
-        emit(response(request))
+        record = response(request)
+        if scenario == "child-environment":
+            record["data"] = {
+                "telegram_token_present": "TELEGRAM_BOT_TOKEN" in os.environ,
+                "artifact_capability": os.environ.get("TELEGRAM_PI_ARTIFACT_CAPABILITY"),
+            }
+        emit(record)
 
 
 if __name__ == "__main__":

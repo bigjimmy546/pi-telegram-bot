@@ -656,7 +656,6 @@ def _persist_metadata(receipt: ArtifactReceipt, metadata_dir: Path) -> None:
             "kind": receipt.kind,
             "size_bytes": receipt.size_bytes,
             "sha256": receipt.sha256,
-            "caption": receipt.caption,
             "created_at_ms": receipt.created_at_ms,
         },
         ensure_ascii=False,

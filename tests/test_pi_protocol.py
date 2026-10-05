@@ -1,7 +1,9 @@
 import asyncio
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from telegram_pi_bot.model import RuntimeEventKind, UiResponse
 from telegram_pi_bot.pi_protocol import RpcError, RpcProcess, RpcProtocolError, RpcTimeout
@@ -24,6 +26,28 @@ async def _discard_event(_event):
 
 
 class RpcProcessTests(unittest.IsolatedAsyncioTestCase):
+    async def test_child_excludes_bot_token_and_preserves_artifact_capability(self):
+        for overrides in ({}, {"TELEGRAM_BOT_TOKEN": "override-token-sentinel"}):
+            with self.subTest(overrides=bool(overrides)), patch.dict(
+                os.environ, {"TELEGRAM_BOT_TOKEN": "inherited-token-sentinel"}
+            ):
+                process = await RpcProcess.start(
+                    [sys.executable, "-u", str(FIXTURE), "child-environment"],
+                    cwd=Path.cwd(),
+                    env={
+                        "TELEGRAM_PI_ARTIFACT_CAPABILITY": "capability-sentinel",
+                        **overrides,
+                    },
+                    event_sink=_discard_event,
+                )
+                try:
+                    result = await process.request({"type": "get_state"}, 1.0)
+                    self.assertFalse(result.data["telegram_token_present"])
+                    self.assertEqual(result.data["artifact_capability"], "capability-sentinel")
+                    self.assertEqual(os.environ["TELEGRAM_BOT_TOKEN"], "inherited-token-sentinel")
+                finally:
+                    await process.close()
+
     async def test_correlates_out_of_order_responses_and_preserves_split_utf8(self):
         events = []
         received_two_events = asyncio.Event()

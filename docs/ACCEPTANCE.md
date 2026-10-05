@@ -4,6 +4,9 @@ This ledger separates automated contracts, installed-Pi compatibility,
 service/release behavior, and real private-chat behavior. Mark a row complete
 only when its listed evidence was directly observed.
 
+Supported Pi version: **1.0.2**. Installer checks are offline; installed-Pi
+probes and real Telegram checks require separate, explicit runs.
+
 ## Automated and local evidence
 
 - [ ] Frozen gate (`uv lock --check`, `uv sync --frozen`, `compileall`, full `unittest`, `diff check`).

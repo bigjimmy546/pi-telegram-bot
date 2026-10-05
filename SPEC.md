@@ -8,16 +8,16 @@ public-amendment: 2026-10-05
 
 Build a separate private Telegram front end for the installed Pi coding agent
 in this source repository; credentials and runtime state remain external. It
-must leave `telegram-claude-bot` and `telegram-codex-bot` unchanged.
+must leave any existing bots unchanged.
 
 The bot must:
 
-- Run Pi as a full coding agent from the fixed working directory
-  the configured absolute Pi working directory, with Pi's normal file, shell,
+- Run Pi as a full coding agent from the configured absolute Pi working
+  directory, with Pi's normal file, shell,
   context-file, skill, extension,
   provider, and native-session behavior.
-- Use the installed `/usr/bin/pi` through its documented JSONL RPC mode. The
-  installed version at specification time is `1.0.0`; implementation must
+- Use the configured `paths.pi_cli` executable through its documented JSONL
+  RPC mode. The supported version is `1.0.2`; implementation must
   record and test the supported version rather than copy Pi internals.
 - Accept text, Telegram voice messages, photos, and documents. Voice uses
   the configured Groq Whisper credential and configuration.
@@ -75,7 +75,7 @@ Non-goals for v1:
   directory's encoded working-directory session folder, owned by Pi and
   resumable from either Telegram or the terminal.
 - **Pending session**: a bot-local empty session selected by `/new`, with a
-  preallocated UUID, optional name, model, and thinking level. Pi 1.0.0 does
+  preallocated UUID, optional name, model, and thinking level. Pi 1.0.2 does
   not persist an empty session, so this state becomes a native Pi session only
   when its first accepted model turn creates the matching JSONL file.
 - **Conversation binding**: the bot-local pointer from the configured user's
@@ -183,7 +183,7 @@ single-poller state. It does not mutate a session or call the model.
 | Purpose | Path | Rule |
 | --- | --- | --- |
 | Source | the source repository | Git-tracked source, tests, docs, and operations files; no secrets or runtime state. |
-| Pi executable | `/usr/bin/pi` | Installed native runtime; never copied or patched by this project. |
+| Pi executable | configured `paths.pi_cli` (example: `/usr/bin/pi`) | Installed native runtime; never copied or patched by this project. |
 | Pi config/auth/sessions | the effective Pi agent directory (default `~/.pi/agent`) | Shared unchanged with terminal Pi; sessions are selected, not copied. Credential values are never printed or stored by the bot. |
 | Bot configuration | `~/.config/telegram-pi-bot/config.toml` | Non-secret settings, mode `0600`. |
 | Bot secrets | `~/.config/telegram-pi-bot/secrets.env` | New BotFather token only, mode `0600`, created after SPEC approval and filled locally by the operator. |
@@ -521,6 +521,8 @@ through one stable interface.
 
 - Unauthorized, non-private, malformed, duplicate, and stale Telegram updates
   have no filesystem, network-download, Pi, Groq, session, or state effect.
+- Edited messages are stale updates. They do not replace pending input or
+  dispatch another prompt, command, or attachment.
 - A duplicate Telegram update or callback is idempotent and cannot start a
   second Pi turn, deliver a second artifact, or answer a blocking UI request twice.
 - A service restart preserves the selected session, non-terminal bundle,
@@ -553,7 +555,9 @@ through one stable interface.
   external modification, but detection is best-effort and its absence never
   proves exclusive access.
 - Telegram reaction or progress-card failure does not cancel accepted Pi work.
-  Final delivery is durable and retryable without re-running Pi.
+  Final delivery is durable and retryable without re-running Pi. If Telegram
+  accepts a send but its acknowledgement is lost, retrying may duplicate a
+  message or artifact; exactly-once Telegram delivery is not guaranteed.
 - `prompt` dispositions `started`, `queued`, and `handled` each terminate by
   their defined path; the six-hour overall turn deadline prevents a wait for
   an event Pi does not promise from hanging the coordinator forever.
@@ -606,8 +610,8 @@ prove at least:
    AGY profile requires `high`; local/remote labels remain accurate; and no
    fallback is automatic;
 6. `/skill` catalog inspection creates no Pi message/session entry, while
-   `/skill advisor <request>` becomes exactly one validated native
-   `/skill:advisor <request>` prompt;
+   `/skill example <request>` becomes exactly one validated native
+   `/skill:example <request>` prompt;
 7. manual/automatic compaction rules and refusal during an active turn;
 8. generic `select`/`confirm` exactness, timeout/restart cancellation,
    immediate `input`/`editor` cancellation, and no reusable grant;
@@ -618,7 +622,7 @@ prove at least:
     artifact-extension Unix-socket authentication, synchronous accepted/rejected
     results, output count/path/symlink/type/size/hash/hidden-and-secret-component
     validation, 24-hour staging expiry, 30-day metadata retention, and durable
-    single delivery;
+    delivery without prompt replay;
 11. completed prompt/answer bodies are absent from bot SQLite while native Pi
     session content remains Pi-owned;
 12. `/doctor` checks are independent, structured, non-mutating, and redact all
@@ -635,13 +639,13 @@ These checks use the installed Pi runtime without a Telegram token:
 3. A pending session is absent from Pi storage before its first prompt; its
    first model turn passes the stored ID/name/model/thinking launch flags,
    materializes a matching native session, and can then be resumed by
-   `/usr/bin/pi --session <id>` inspection. A terminal-created temporary
+   the configured Pi executable's `--session <id>` inspection. A terminal-created temporary
    session is discoverable through `list_sessions`.
 4. RPC extension-UI fixtures prove generic `select`/`confirm` correlation and
    `input`/`editor` cancellation without executing a dangerous command.
 5. A loaded bot-owned artifact extension proves an accepted and a rejected
    synchronous Unix-socket tool result without contacting Telegram.
-6. Compatibility checks record `/usr/bin/pi --version` and fail clearly on an
+6. Compatibility checks record the configured Pi executable's `--version` and fail clearly on an
    unsupported protocol instead of guessing.
 
 ### C. Service and release gate
@@ -682,29 +686,28 @@ After the operator enters the new BotFather token locally:
    AGY defaults and selections use `high`, `/thinking` shows live valid levels,
    and an unavailable or disallowed default does not trigger fallback.
 6. `/skill` lists the live catalog without creating a Pi message; direct
-   `/skill grillme <request>` invokes the native skill in the same turn.
+   `/skill example <request>` invokes the native skill in the same turn.
 7. `/compact`, `/usage`, `/status`, hidden `/doctor`, `/stop`, generic blocking
    UI buttons, `send_file`, and `send_image` each pass one bounded live check.
 8. A non-allowlisted test update is rejected before download or Pi invocation.
 9. Service restart and reboot restore polling, selected idle session, and safe
    queued/outbound state without duplicate execution.
 
-### E. Required independent review gates
+### E. Independent security and deployment review
 
-Because this is a formal greenfield project with remote full-machine access, a
-different AI from the implementation author must review the first vertical
-slice and the pre-deploy diff. The handoff includes this SPEC, exact diff scope,
-and acceptance commands. The reviewer reruns checks before reading the diff.
-Deployment does not proceed if no independent reviewer is available.
+An independent reviewer must check security boundaries and deployment changes
+before activation. The review includes this SPEC, the exact diff, and the
+acceptance commands. The reviewer reruns checks read-only and reports blocking
+findings before deployment proceeds.
 
 ## 7. Decisions taken
 
 1. **Separate third bot and token.** Rejected reusing an existing bot/token
    because it would risk duplicate polling and couple rollback paths.
 2. **Full coding agent.** Rejected chat-only mode because the goal is parity
-   with the operator's Claude and Codex coding bots.
+   with terminal Pi.
 3. **Python plus Pi RPC.** Rejected a TypeScript Pi-SDK rebuild because the
-   Python Claude bot already proves the required Telegram/media/state shape,
+   Python implementation provides the required Telegram/media/state shape,
    while RPC exposes Pi's native lifecycle without modifying existing code.
 4. **Separate project folder.** Rejected modifying or extracting a shared
    package from either live bot; v1 prioritizes isolation and rollback.
@@ -722,8 +725,8 @@ Deployment does not proceed if no independent reviewer is available.
 10. **Lifecycle reactions and one progress card.** Rejected a permanent `👍`
     and verbose streaming because `👀 -> 👌/😨` communicates accepted versus
     terminal state with less noise.
-11. **Automatic skill routing plus two explicit controls.** Rejected the Claude
-    bot's mandatory pick-then-send flow. Direct invocation is one message and
+11. **Automatic skill routing plus two explicit controls.** Rejected a
+    mandatory pick-then-send flow. Direct invocation is one message and
     `/skill` is a context-free memory aid.
 12. **Manual and automatic compaction; no clone.** Rejected `/clone` in v1
     because it preserves rather than reduces context and is not needed for the
@@ -775,7 +778,7 @@ Deployment does not proceed if no independent reviewer is available.
     limits and “bounded retention”; item/count/aggregate caps, allowed outbound
     types, and 24-hour/30-day cleanup periods are part of the contract.
 26. **Bot-local empty sessions.** Rejected claiming `/new` immediately creates
-    a native Pi file: Pi 1.0.0 persists no session until a prompt. The bot owns
+    a native Pi file: Pi 1.0.2 persists no session until a prompt. The bot owns
     the pending UUID/name/model/thinking and supplies them on the first turn.
 27. **Explicit prompt dispositions.** Rejected waiting unconditionally for
     `agent_settled`; `handled` is terminal without a run, while `started` and

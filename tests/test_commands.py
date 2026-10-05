@@ -22,15 +22,15 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0)
 
     async def test_skill_catalog_is_context_free_and_direct_skill_is_one_prompt(self):
-        system = await self.system(skills=[("advisor", "Investment advisor")])
+        system = await self.system(skills=[("example", "Example skill")])
         await system.telegram.command("/skill")
         self.assertEqual(system.pi.prompt_count, 0)
         self.assertEqual(system.store.load(system.CHAT_ID).pending_sessions, {})
-        self.assertEqual([label for label, _ in system.telegram.choice_messages[-1][1]], ["advisor"])
-        self.assertIn("Investment advisor", system.telegram.choice_messages[-1][0])
-        await system.telegram.command("/skill advisor analyze NVDA")
+        self.assertEqual([label for label, _ in system.telegram.choice_messages[-1][1]], ["example"])
+        self.assertIn("Example skill", system.telegram.choice_messages[-1][0])
+        await system.telegram.command("/skill example summarize report")
         await system.clock.advance(seconds=5)
-        self.assertEqual(system.pi.prompts, ["/skill:advisor analyze NVDA"])
+        self.assertEqual(system.pi.prompts, ["/skill:example summarize report"])
 
     async def test_model_catalog_and_agy_profile_are_exact(self):
         system = await self.system(models=mixed_provider_models())

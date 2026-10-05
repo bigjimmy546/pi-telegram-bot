@@ -324,16 +324,19 @@ class ArtifactBrokerTests(unittest.IsolatedAsyncioTestCase):
             try:
                 response = await send_socket_request(
                     broker,
-                    {"id": "artifact-1", "kind": "file", "path": str(source)},
+                    {"id": "artifact-1", "kind": "file", "path": str(source), "caption": "CAPTION_SENTINEL"},
                 )
                 self.assertTrue(response["accepted"])
                 receipt = broker.receipts()[0]
+                self.assertEqual(receipt.caption, "CAPTION_SENTINEL")
                 verify_staged(receipt)
                 Path(receipt.staged_path).write_bytes(b"changed after acceptance")
                 with self.assertRaises(ArtifactRejected) as raised:
                     verify_staged(receipt)
                 self.assertEqual(raised.exception.reason.value, "source_changed")
                 metadata = policy.state_dir / "artifact-metadata" / f"{receipt.artifact_id}.json"
+                self.assertNotIn("caption", json.loads(metadata.read_text(encoding="utf-8")))
+                self.assertNotIn("CAPTION_SENTINEL", metadata.read_text(encoding="utf-8"))
                 delete_staged(receipt, policy)
                 self.assertFalse(Path(receipt.staged_path).exists())
                 self.assertTrue(metadata.exists())

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import tempfile
+import sqlite3
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from telegram_pi_bot.coordinator import transition
-from telegram_pi_bot.store import StoreConflict
+from telegram_pi_bot.store import SCHEMA_VERSION, StoreConflict, StoreCorrupt
 from tests.fakes import (
     add_text,
     empty_state,
@@ -17,6 +19,16 @@ from tests.fakes import (
 
 
 class ControlStoreTests(unittest.TestCase):
+    def test_rejects_an_existing_unsupported_schema_version(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = make_store(root)
+            with closing(sqlite3.connect(store.path)) as database:
+                database.execute("UPDATE schema_meta SET version = ?", (SCHEMA_VERSION + 1,))
+                database.commit()
+            with self.assertRaisesRegex(StoreCorrupt, "unsupported control database schema"):
+                make_store(root)
+
     def test_recovery_releases_claimed_session_operation_as_uncertain(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -470,6 +482,8 @@ class ControlStoreTests(unittest.TestCase):
             store.commit(0, Transition(legacy_state, ()))
 
             reopened = make_store(root)
+            with closing(sqlite3.connect(reopened.path)) as database:
+                self.assertEqual(database.execute("SELECT version FROM schema_meta").fetchall(), [(2,)])
             persisted = reopened.load(104)
             self.assertEqual(persisted.selected_session_id, "native-legacy")
             self.assertEqual(

@@ -122,6 +122,10 @@ class TelegramAdapter:
         ):
             return
 
+        # Edits are stale input, not authorization to run another Pi turn.
+        if getattr(update, "edited_message", None) is not None:
+            return
+
         update_id = getattr(update, "update_id", None)
         if type(update_id) is not int or update_id < 0:
             return
@@ -160,8 +164,16 @@ class TelegramAdapter:
         text = getattr(message, "text", None)
         if isinstance(text, str) and text.startswith("/"):
             command = parse_command(text)
-            if command is not None and self._claim(update_id):
-                await self._dispatch(_telegram_action(command, update_id, message_id, self._now_ms()))
+            known_commands = {f"/{item.command}" for item in BOT_COMMANDS} | {
+                "/start", "/clear", "/reset", "/doctor",
+            }
+            if command is None and text.partition(" ")[0] in known_commands:
+                return
+            if self._claim(update_id):
+                if command is None:
+                    await self._safe_text(chat.id, "Unknown bot command. Use /help, or send text without a leading /.")
+                else:
+                    await self._dispatch(_telegram_action(command, update_id, message_id, self._now_ms()))
             return
         if isinstance(text, str) and text:
             await self._accept(

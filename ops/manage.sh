@@ -166,12 +166,17 @@ clear_deployed_enablement() {
 
 restore_snapshot() {
     local source=$1
-    local target enabled active kind staged stopped_pid restored_pid launcher
+    local target enabled active kind staged stopped_pid restored_pid launcher verified
     [[ -d $source && ! -L $source ]] || return 1
     target=$(<"$source/previous-target")
     enabled=$(<"$source/previous-enabled")
     active=$(<"$source/previous-active")
     kind=$(<"$source/previous-unit-kind")
+
+    if [[ $target != __ABSENT__ ]]; then
+        verified=$(verify_release "${target##*/}") || return 1
+        [[ $target == "$verified" ]] || return 1
+    fi
 
     stopped_pid=$(systemctl_user show "$service" -p MainPID --value 2>/dev/null || printf '0')
     [[ $stopped_pid =~ ^[0-9]+$ ]] || return 1

@@ -71,7 +71,7 @@ class Doctor:
             return "Telegram bot identity reachable"
 
         async def pi_version():
-            version = await self.command_runner(("/usr/bin/pi", "--version"))
+            version = await self.command_runner((str(self.config.pi_cli), "--version"))
             if version not in SUPPORTED_PI_VERSIONS:
                 raise ValueError
             return f"Pi {version} is explicitly supported"

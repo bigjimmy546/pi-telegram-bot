@@ -28,8 +28,6 @@ uv lock --check
 uv sync --frozen
 uv run python -m compileall -q src tests
 uv run python -m unittest discover -s tests -v
-uv run python tests/live_runtime_probe.py --metadata
-uv run python tests/live_runtime_probe.py --local-text
 ops/verify-unit.sh
 git diff --check
 
@@ -80,6 +78,10 @@ printf '%s\n' "$build_id" >"$stage/SOURCE_COMMIT"
 (
     cd -- "$stage"
     uv venv --python 3.13 --relocatable .venv
+    # Avoid uv's mutable minor-version symlink; keep this exact interpreter.
+    interpreter=$(readlink -f -- .venv/bin/python)
+    [[ -f $interpreter && -x $interpreter ]] || fail "The Python interpreter is unavailable."
+    ln -sf -- "$interpreter" .venv/bin/python
     VIRTUAL_ENV="$stage/.venv" uv sync --frozen --no-dev --no-editable --active --link-mode copy
     extension=.venv/lib/python3.13/site-packages/telegram_pi_bot/extensions/telegram_artifacts.ts
     [[ -f $extension && ! -L $extension ]] || fail "The packaged artifact extension is missing."
@@ -88,6 +90,7 @@ printf '%s\n' "$build_id" >"$stage/SOURCE_COMMIT"
     find . -type f ! -name SHA256SUMS -print0 \
         | LC_ALL=C sort -z \
         | xargs -0 sha256sum >SHA256SUMS
+    sha256sum .venv/bin/python >>SHA256SUMS
     sha256sum --check --quiet SHA256SUMS
 )
 

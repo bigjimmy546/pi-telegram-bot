@@ -36,13 +36,27 @@ Before any deploy, manual restart, or reboot, confirm `/status` shows no active
 turn or session operation. Stopping the bot during a turn aborts that turn and
 can leave its outcome uncertain.
 
-The installer accepts a clean, exact 40-character commit ID, runs the frozen
+The installer accepts a clean, exact 40-character commit ID, runs the offline
 checks, copies tracked runtime material into a new release, creates its frozen
 environment, verifies the unit against that staged launcher, and records file
 checksums. It leaves the active `current` link unchanged. Deployment requires
 safe config and secret modes, user lingering enabled (`loginctl enable-linger`),
 a successful doctor check, and a single-poller state. It records the prior
 release link, unit, and enablement state before activation.
+
+Installation does not launch Pi, send a model prompt, or contact Telegram.
+It may download Python and locked packages through uv. Installed-Pi probes in
+`tests/live_runtime_probe.py` are separate, opt-in checks for the documented
+fixture environment (`/usr/bin/pi`, the account's home directory, and
+`ollama/qwen3.8-orcarouter:latest`). `--local-text` and
+`--artifact-extension-only` send model prompts; `--offline` does not prevent
+those provider calls. Deployment's doctor uses the configured Pi executable
+and checks Telegram connectivity before activation.
+
+The Python executable is pinned to its resolved interpreter path and included
+in the checksum manifest. Keep that external Python installation available:
+the interpreter's standard library and system libraries are host dependencies,
+not bundled immutable release content.
 
 `status` reports the active release and service health without exposing secret
 values. Inspect journal output through application logging:
@@ -69,6 +83,10 @@ delete releases or touch `.pi` sessions. Verify status and the user journal
 afterward. If the previous target or backup record is unavailable, stop and
 recover the recorded release/unit state manually; do not remove release data
 or native Pi session files as part of bot recovery.
+
+Rollback verifies the previous release's manifest before stopping the current
+service or switching the target. The service restoration uses multiple steps;
+only the active-release symlink replacement is atomic.
 
 For an uncertain turn after a service restart, do not resend the prompt
 automatically. Inspect `/status`, `/doctor`, and Pi's native session through

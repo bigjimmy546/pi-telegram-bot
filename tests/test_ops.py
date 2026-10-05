@@ -66,11 +66,12 @@ class OperationsTests(unittest.TestCase):
         self.assertIn("uv venv --python 3.13 --relocatable .venv", script)
         self.assertIn("uv sync --frozen", script)
         self.assertIn("python -m unittest discover", script)
-        self.assertIn("tests/live_runtime_probe.py --metadata", script)
-        self.assertIn("tests/live_runtime_probe.py --local-text", script)
+        self.assertNotIn("live_runtime_probe.py", script)
         self.assertIn("ops/verify-unit.sh", script)
         self.assertIn("telegram_pi_bot/extensions/telegram_artifacts.ts", script)
         self.assertIn("sha256sum", script)
+        self.assertIn("readlink -f -- .venv/bin/python", script)
+        self.assertIn("sha256sum .venv/bin/python >>SHA256SUMS", script)
         self.assertNotIn("systemctl --user start", script)
         self.assertNotIn("ln -sfn", script)
 
@@ -228,6 +229,20 @@ class OperationsTests(unittest.TestCase):
             result = fixture.manage("rollback")
             self.assertNotEqual(result.returncode, 0)
 
+    def test_rollback_checks_prior_release_before_stopping_or_switching(self):
+        with tempfile.TemporaryDirectory() as raw:
+            fixture = OpsFixture(Path(raw))
+            old = fixture.release("b" * 40)
+            new = fixture.release("a" * 40)
+            fixture.current.symlink_to(new)
+            fixture.create_backup(old, enabled=False)
+            (old / "ops/pi-telegram.service").write_text("tampered unit", encoding="utf-8")
+            result = fixture.manage("rollback")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(fixture.current.resolve(), new.resolve())
+            calls = fixture.systemctl_calls.read_text(encoding="utf-8")
+            self.assertNotIn("--user stop pi-telegram.service", calls)
+
     def test_rollback_rejects_a_missing_saved_unit_instead_of_installing_empty_unit(self):
         with tempfile.TemporaryDirectory() as raw:
             fixture = OpsFixture(Path(raw))
@@ -291,6 +306,10 @@ if args and args[0] == 'venv':
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text('#!/bin/sh\\nexit 0\\n')
     binary.chmod(0o700)
+    interpreter = pathlib.Path(__file__).with_name('python-fixture')
+    interpreter.write_text('#!/bin/sh\\nexit 0\\n')
+    interpreter.chmod(0o700)
+    (root / 'bin/python').symlink_to(interpreter)
 elif args and args[0] == 'sync' and os.environ.get('VIRTUAL_ENV'):
     extension = pathlib.Path(os.environ['VIRTUAL_ENV']) / 'lib/python3.13/site-packages/telegram_pi_bot/extensions/telegram_artifacts.ts'
     extension.parent.mkdir(parents=True, exist_ok=True)
@@ -325,6 +344,11 @@ elif args and args[0] == 'sync' and os.environ.get('VIRTUAL_ENV'):
             verify = subprocess.run(["sha256sum", "--check", "--quiet", "SHA256SUMS"],
                                     cwd=release, capture_output=True, text=True)
             self.assertEqual(verify.returncode, 0, verify.stderr)
+            self.assertIn(".venv/bin/python", (release / "SHA256SUMS").read_text())
+            (fakebin / "python-fixture").write_text("changed interpreter\n", encoding="utf-8")
+            changed = subprocess.run(["sha256sum", "--check", "--quiet", "SHA256SUMS"],
+                                     cwd=release, capture_output=True, text=True)
+            self.assertNotEqual(changed.returncode, 0)
 
 
 class OpsFixture:

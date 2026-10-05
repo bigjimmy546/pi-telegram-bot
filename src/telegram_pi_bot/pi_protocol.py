@@ -123,6 +123,13 @@ class RpcProcess:
 
         child_env = os.environ.copy()
         child_env.update(env)
+        secret_values = tuple(
+            value
+            for key, value in child_env.items()
+            if value and _SECRET_ENV_NAME.search(key)
+        )
+        # The transport credential must never reach Pi or its tool subprocesses.
+        child_env.pop("TELEGRAM_BOT_TOKEN", None)
         try:
             process = await asyncio.create_subprocess_exec(
                 *argv,
@@ -135,11 +142,6 @@ class RpcProcess:
         except (OSError, ValueError) as error:
             raise RpcStartError("RPC child failed to start") from error
 
-        secret_values = tuple(
-            value
-            for key, value in child_env.items()
-            if value and _SECRET_ENV_NAME.search(key)
-        )
         instance = cls(process, event_sink, secret_values)
         instance._stdout_task = asyncio.create_task(
             instance._read_stdout(), name="pi-rpc-stdout"

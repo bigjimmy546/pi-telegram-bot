@@ -12,7 +12,7 @@ A single-user Telegram front end for the Pi coding agent on Linux. It runs Pi as
 - **Blocking UI relay**: Relays Pi's blocking `select` and `confirm` UI requests as Telegram interactive buttons.
 - **Artifact delivery**: Synchronous Unix-domain socket tools (`send_file`, `send_image`) with cryptographic hash verification and strict allowed-root checks.
 - **Durable delivery**: Resilient SQLite-backed queueing and state transitions across restarts.
-- **Guarded deployment**: Immutable checksummed releases, atomic symlink activation, and atomic service rollback.
+- **Guarded deployment**: Immutable checksummed releases, atomic symlink activation, and guarded service rollback.
 
 ## Requirements
 
@@ -70,5 +70,5 @@ git diff --check
 - [Specification](SPEC.md) — Full technical specification and security boundaries
 - [Operations Guide](docs/OPERATIONS.md) — Deployment, service management, and rollback
 - [Acceptance Evidence Ledger](docs/ACCEPTANCE.md) — Verification checklist
-- [Security Policy](SECURITY.md) — Vulnerability reporting and model isolation
+- [Security Policy](SECURITY.md) — Vulnerability reporting and unsandboxed permissions
 - [MIT License](LICENSE)

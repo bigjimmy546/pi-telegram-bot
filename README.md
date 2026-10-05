@@ -4,7 +4,7 @@ A single-user Telegram front end for the Pi coding agent on Linux. It runs Pi as
 
 > **WARNING:** Pi runs unsandboxed with the service account's normal operating system permissions. Telegram prompts can inspect, modify, or delete any file and run any shell command that the host user account can access. Deploy only for your own positive Telegram user ID in private chats with a dedicated BotFather token.
 
-> **Release notice:** v0.1.0 is unsupported. See [SECURITY.md](SECURITY.md) for the known defects. v0.1.1 is a candidate release.
+> **Release notice:** v0.1.0 is unsupported. See [SECURITY.md](SECURITY.md) for the known defects.
 
 ## Features
 

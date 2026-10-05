@@ -4,6 +4,10 @@ This bot launches Pi with the service account's normal, unsandboxed filesystem
 and shell permissions. Run it only with a private BotFather token and one
 explicitly configured Telegram user ID.
 
+Version 0.1.0 is unsupported because it passes `TELEGRAM_BOT_TOKEN` into Pi
+child environments and treats edited messages as new prompts. Fixes for both
+defects are included in the 0.1.1 candidate.
+
 When this repository is public, report vulnerabilities from its Security tab
 using "Report a vulnerability". Reports are private. The maintainer must enable
 GitHub private vulnerability reporting immediately after making the repository

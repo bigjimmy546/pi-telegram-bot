@@ -132,7 +132,9 @@ Non-goals for v1:
 2. An accepted input receives `👀` immediately on a best-effort basis.
 3. A text item opens or extends a 5-second bundle. Voice, photo, or document
    input opens or converts it to a 10-second media bundle. `Send now` dispatches
-   immediately.
+   immediately. `Hold 2 min` sets an open or queued bundle's wait to 2 minutes
+   from the tap, and each later item restarts that 2-minute wait until the
+   bundle is sent; the next bundle returns to 5/10-second delays.
 4. While Pi is active, a new bundle queues for the next turn by default. An
    explicit `Steer current` action sends it through Pi's `steer` command.
 5. Only one global Pi turn runs at a time. Normally the next queued bundle

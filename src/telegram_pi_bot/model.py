@@ -316,6 +316,7 @@ class InputBundle:
     timer_generation: int
     created_at_ms: int
     expires_at_ms: int
+    held: bool = False
 
     def __post_init__(self) -> None:
         _required_id(self.bundle_id, "bundle id")

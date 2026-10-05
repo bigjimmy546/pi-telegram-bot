@@ -691,6 +691,7 @@ def _bundle_json(bundle: InputBundle) -> str:
         {
             "kind": bundle.kind,
             "timer_generation": bundle.timer_generation,
+            "held": bundle.held,
             "items": [
                 {
                     "kind": item.kind,
@@ -728,6 +729,7 @@ def _load_bundle(row: sqlite3.Row) -> InputBundle:
         _required_int(payload.get("timer_generation"), "timer generation"),
         row["created_at_ms"],
         row["expires_at_ms"],
+        payload.get("held") is True,
     )
 
 

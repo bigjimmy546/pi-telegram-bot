@@ -29,7 +29,8 @@ from telegram_pi_bot.telegram_ui import BOT_COMMANDS, ProgressRenderer, callback
 
 HELP_TEXT = (
     "Send text, voice, photos, or documents. Text waits 5 seconds and media "
-    "waits 10 seconds so nearby messages can form one request. 👀 means accepted, "
+    "waits 10 seconds so nearby messages can form one request; tap Hold 2 min "
+    "to keep collecting. 👀 means accepted, "
     "👌 means delivered, and 😨 means failed or uncertain. New work queues while "
     "Pi is busy; use Send or Steer explicitly. Use Pi sessions sequentially with "
     "the terminal; the bot cannot lock terminal Pi. Generic blocking select/confirm "
@@ -274,6 +275,7 @@ class BotApplication:
         await self._drain()
         if action.kind in INPUT_ACTION_KINDS | {
             "stop",
+            "hold_bundle",
             "bundle_dispatched",
             "turn_completed",
         }:
@@ -468,6 +470,7 @@ class BotApplication:
         kind = {
             "send": "send_now",
             "cancel": "cancel_bundle",
+            "hold": "hold_bundle",
             "steer": "steer_current",
         }.get(callback_action)
         if kind is None:
@@ -520,6 +523,13 @@ class BotApplication:
                     callback_data("send", key, bundle.timer_generation),
                 )
             ]
+            if not bundle.held and bundle.status in {"open", "queued"}:
+                choices.append(
+                    (
+                        "Hold 2 min",
+                        callback_data("hold", key, bundle.timer_generation),
+                    )
+                )
             if (
                 bundle.status == "queued"
                 and state.next_bundle is not None
@@ -540,7 +550,8 @@ class BotApplication:
                 )
             )
             try:
-                text = f"{len(bundle.items)} input item(s), {bundle.status}. Choose how Pi should handle it."
+                held = ", held 2 min" if bundle.held else ""
+                text = f"{len(bundle.items)} input item(s), {bundle.status}{held}. Choose how Pi should handle it."
                 if previous is None:
                     message_id = await self.telegram.send_choices(self.config.allowed_user_id, text, tuple(choices))
                 else:

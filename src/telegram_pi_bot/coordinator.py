@@ -24,6 +24,7 @@ from telegram_pi_bot.model import (
 
 TEXT_DELAY_MS = 5_000
 MEDIA_DELAY_MS = 10_000
+HOLD_DELAY_MS = 2 * 60 * 1_000
 UI_TIMEOUT_MS = 10 * 60 * 1_000
 PENDING_RETENTION_MS = 24 * 60 * 60 * 1_000
 TERMINAL_TURN_STATUSES = {
@@ -60,6 +61,7 @@ def transition(state: BotState, action: ConversationAction) -> Transition:
         "bundle_timer_fired": _dispatch_bundle,
         "send_now": _dispatch_bundle,
         "cancel_bundle": _cancel_bundle,
+        "hold_bundle": _hold_bundle,
         "steer_current": _steer_current,
         "stop": _stop,
         "new_session": _new_session,
@@ -149,11 +151,18 @@ def _add_input(state: BotState, action: ConversationAction) -> Transition:
         )
     else:
         is_media = media or current.kind == "media"
+        delay_ms = (
+            HOLD_DELAY_MS
+            if current.held
+            else MEDIA_DELAY_MS
+            if is_media
+            else TEXT_DELAY_MS
+        )
         bundle = replace(
             current,
             kind="media" if is_media else "text",
             items=(*current.items, item),
-            due_at_ms=now_ms + (MEDIA_DELAY_MS if is_media else TEXT_DELAY_MS),
+            due_at_ms=now_ms + delay_ms,
             timer_generation=current.timer_generation + 1,
             expires_at_ms=now_ms + PENDING_RETENTION_MS,
         )
@@ -300,6 +309,54 @@ def _cancel_bundle(state: BotState, action: ConversationAction) -> Transition:
     return Transition(
         next_state,
         (_effect(state, action, 0, "cancel_timer", bundle_id=bundle_id),),
+        _action_id(state, action),
+    )
+
+
+def _hold_bundle(state: BotState, action: ConversationAction) -> Transition:
+    bundle_id = action.get("bundle_id")
+    bundle = _live_bundle(state, bundle_id) if isinstance(bundle_id, str) else None
+    if bundle is None or bundle.status not in {"open", "queued"}:
+        return Transition(state, action_id=_action_id(state, action))
+    now_ms = _now(state, action)
+    held = replace(
+        bundle,
+        held=True,
+        due_at_ms=now_ms + HOLD_DELAY_MS,
+        timer_generation=bundle.timer_generation + 1,
+    )
+    bundles = dict(state.bundles)
+    bundles[bundle_id] = held
+    next_state = _advance(
+        state,
+        now_ms,
+        bundle=(
+            held
+            if state.bundle is not None and state.bundle.bundle_id == bundle_id
+            else state.bundle
+        ),
+        next_bundle=(
+            held
+            if state.next_bundle is not None
+            and state.next_bundle.bundle_id == bundle_id
+            else state.next_bundle
+        ),
+        bundles=bundles,
+    )
+    return Transition(
+        next_state,
+        (
+            _effect(state, action, 0, "cancel_timer", bundle_id=bundle_id),
+            _effect(
+                state,
+                action,
+                1,
+                "schedule_timer",
+                bundle_id=bundle_id,
+                generation=held.timer_generation,
+                due_at_ms=held.due_at_ms,
+            ),
+        ),
         _action_id(state, action),
     )
 

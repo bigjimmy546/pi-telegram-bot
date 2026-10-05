@@ -184,6 +184,30 @@ class VerticalSliceTests(unittest.IsolatedAsyncioTestCase):
         await system.pi.emit_text("sent")
         await system.pi.emit_settled()
 
+    async def test_hold_keeps_collecting_until_two_minutes_after_latest_item(self):
+        system = await self._system()
+        await system.telegram.receive(text="part one", message_id=111)
+        await system.telegram.press_choice("Hold 2 min")
+        await system.clock.advance(seconds=60)
+        await system.telegram.receive(text="part two", message_id=112)
+        await system.clock.advance(seconds=119)
+        self.assertEqual(system.pi.prompts, [])
+        self.assertEqual(
+            [label for label, _data in system.telegram.choice_messages[-1][1]],
+            ["Send now", "Cancel"],
+        )
+
+        await system.clock.advance(seconds=1)
+        self.assertEqual(len(system.pi.prompts), 1)
+        self.assertIn("part one", system.pi.prompts[0])
+        self.assertIn("part two", system.pi.prompts[0])
+        await system.pi.emit_text("held")
+        await system.pi.emit_settled()
+
+        await system.telegram.receive(text="normal", message_id=113)
+        await system.clock.advance(seconds=5)
+        self.assertEqual(system.pi.prompts[-1], "normal")
+
     async def test_stop_aborts_pi_and_freezes_next_bundle(self):
         system = await self._system()
         await system.telegram.receive(text="active", message_id=109)
